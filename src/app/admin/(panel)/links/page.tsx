@@ -1,10 +1,11 @@
 import { getSupabaseAdmin, supabasePublicUrl } from '@/lib/supabase';
 import { Alert, Card, CardBody, PageHeader } from '@/components/ui';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { Icon } from '@/components/Icon';
 import { LinkForm } from '@/components/LinkForm';
 import { ICON_TEMPLATES } from '@/lib/icons';
 import { contentPreview, contentTypeMeta } from '@/lib/content';
-import { createLink, updateLink, deleteLink } from './actions';
+import { createLink, updateLink, deleteLink, moveLink } from './actions';
 import type { Group, IconItem, LinkItem, LinkPlacement, Vehicle } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export default async function LinksPage({
 
   const [{ data: links }, { data: groups }, { data: placements }, { data: icons }, { data: vehicles }] =
     await Promise.all([
-      supabase.from('links').select('*').order('label'),
+      supabase.from('links').select('*').order('sort_order').order('created_at'),
       supabase.from('groups').select('*').order('name'),
       supabase.from('link_placements').select('*'),
       supabase.from('icons').select('*').order('created_at', { ascending: false }),
@@ -85,10 +86,27 @@ export default async function LinksPage({
           {linkList.length === 0 ? (
             <Card><CardBody><p className="text-gray-500 text-center py-6">Noch keine Inhalte.</p></CardBody></Card>
           ) : (
-            linkList.map((l) => (
+            linkList.map((l, i) => (
               <Card key={l.id}>
                 <CardBody className="p-5">
-                  <details>
+                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-0.5 shrink-0 pt-1">
+                    <form action={moveLink}>
+                      <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="dir" value="up" />
+                      <button type="submit" title="Nach oben" disabled={i === 0} className="p-1 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-20">
+                        <ChevronUp size={16} />
+                      </button>
+                    </form>
+                    <form action={moveLink}>
+                      <input type="hidden" name="id" value={l.id} />
+                      <input type="hidden" name="dir" value="down" />
+                      <button type="submit" title="Nach unten" disabled={i === linkList.length - 1} className="p-1 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-20">
+                        <ChevronDown size={16} />
+                      </button>
+                    </form>
+                  </div>
+                  <details className="flex-1 min-w-0">
                     <summary className="flex items-center gap-3 cursor-pointer list-none">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--brand)', color: 'var(--brand-fg)' }}>
                         <Icon icon={l.icon} size={20} />
@@ -135,6 +153,7 @@ export default async function LinksPage({
                       <button className="text-sm text-red-600 hover:underline">Element löschen</button>
                     </form>
                   </details>
+                  </div>
                 </CardBody>
               </Card>
             ))

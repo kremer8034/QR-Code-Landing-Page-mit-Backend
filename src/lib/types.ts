@@ -76,6 +76,7 @@ export interface LinkItem {
   mime: string | null;
   description: string;
   icon: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

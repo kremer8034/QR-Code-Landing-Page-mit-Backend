@@ -82,6 +82,7 @@ create table if not exists public.links (
   mime        text,           -- uploaded file mime type
   description text not null default '',
   icon        text not null default 'lucide:Link',
+  sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );

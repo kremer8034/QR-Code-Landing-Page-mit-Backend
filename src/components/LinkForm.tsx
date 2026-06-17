@@ -1,11 +1,42 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Field, Input, Textarea, Select } from '@/components/ui';
+import { Button, Field, Input, Textarea, Select, Alert } from '@/components/ui';
 import { IconPicker } from '@/components/IconPicker';
 import { VehiclePicker } from '@/components/VehiclePicker';
 import { CONTENT_TYPES, defaultIconFor } from '@/lib/content';
 import type { ContentType } from '@/lib/types';
+
+// Vercel caps serverless / Server Action request bodies at ~4.5 MB. Keep a safe
+// margin so uploads never hit the platform limit (which would crash the page).
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB
+
+/** Downscale + re-encode a raster image in the browser to keep it small. */
+async function compressImage(file: File): Promise<File> {
+  // SVGs and tiny files are left untouched.
+  if (file.type === 'image/svg+xml') return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 1600;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.82));
+    if (!blob) return file;
+    // Only use the re-encoded version if it is actually smaller.
+    if (blob.size >= file.size && file.size <= MAX_UPLOAD_BYTES) return file;
+    const base = file.name.replace(/\.[^.]+$/, '') || 'bild';
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return file; // e.g. unsupported format (HEIC) — fall back to the original
+  }
+}
 
 interface Template { key: string; label: string }
 interface CustomIcon { value: string; url: string; name: string }
@@ -49,14 +80,55 @@ export function LinkForm({
 }) {
   const editing = Boolean(initial?.id);
   const [type, setType] = useState<ContentType>(initial?.type ?? 'link');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const isButtonType = ['link', 'pdf', 'phone', 'email', 'address'].includes(type);
 
   const labelText =
     type === 'text' ? 'Überschrift (optional)' : type === 'image' ? 'Beschriftung (optional)' : 'Bezeichnung';
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const form = e.currentTarget;
+    const fileInput = form.querySelector<HTMLInputElement>('input[name="file"]');
+    const file = fileInput?.files?.[0];
+
+    // Images: compress in the browser before sending (keeps payload small and
+    // avoids the server upload-size limit). Submit programmatically.
+    if (type === 'image' && file) {
+      e.preventDefault();
+      setError(null);
+      setBusy(true);
+      try {
+        const prepared = await compressImage(file);
+        if (prepared.size > MAX_UPLOAD_BYTES) {
+          setError('Das Bild ist auch nach der Komprimierung zu groß (max. 4 MB). Bitte ein kleineres Bild verwenden.');
+          setBusy(false);
+          return;
+        }
+        const fd = new FormData(form);
+        fd.set('file', prepared);
+        await (action(fd) as unknown as Promise<void>);
+      } catch {
+        setError('Beim Hochladen ist ein Fehler aufgetreten. Bitte erneut versuchen.');
+        setBusy(false);
+      }
+      return;
+    }
+
+    // PDFs (and other files) can't be compressed — guard the size up front so
+    // the user gets a clear message instead of a failed request.
+    if (file && file.size > MAX_UPLOAD_BYTES) {
+      e.preventDefault();
+      setError('Die Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.');
+      return;
+    }
+
+    setBusy(true);
+  }
+
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} onSubmit={handleSubmit} className="space-y-4">
       {initial?.id ? <input type="hidden" name="id" value={initial.id} /> : null}
 
       <Field label="Typ">
@@ -156,7 +228,11 @@ export function LinkForm({
         <VehiclePicker name="vehicle_ids" vehicles={vehicles} selected={selectedVehicles} />
       </div>
 
-      <Button type="submit">{submitLabel}</Button>
+      {error ? <Alert kind="error">{error}</Alert> : null}
+
+      <Button type="submit" disabled={busy}>
+        {busy ? 'Wird gespeichert…' : submitLabel}
+      </Button>
     </form>
   );
 }

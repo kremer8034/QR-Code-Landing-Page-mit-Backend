@@ -53,8 +53,10 @@ export async function resolveVehicleLinks(vehicle: Vehicle): Promise<ResolvedLin
     if (link) resolved.push({ link, scope: p.scope, position: p.position });
   }
 
+  // Order is controlled centrally via each element's sort_order (set in the
+  // backoffice). Falls back to scope then label for ties.
   resolved.sort((a, b) => {
-    if (a.position !== b.position) return a.position - b.position;
+    if (a.link.sort_order !== b.link.sort_order) return a.link.sort_order - b.link.sort_order;
     if (scopeRank[a.scope] !== scopeRank[b.scope]) return scopeRank[a.scope] - scopeRank[b.scope];
     return a.link.label.localeCompare(b.link.label, 'de');
   });

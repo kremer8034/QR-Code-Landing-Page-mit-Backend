@@ -15,17 +15,25 @@ async function uploadContentFile(
   type: ContentType,
 ): Promise<{ path: string; mime: string } | null> {
   if (!(file instanceof File) || file.size === 0) return null;
-  const supabase = getSupabaseAdmin();
-  const fallbackMime = type === 'pdf' ? 'application/pdf' : 'application/octet-stream';
-  const ext = (file.name.split('.').pop() || (type === 'pdf' ? 'pdf' : 'bin')).toLowerCase();
-  const path = `${type}/${shortId(12)}.${ext}`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const { error } = await supabase.storage.from('content').upload(path, bytes, {
-    contentType: file.type || fallbackMime,
-    upsert: true,
-  });
-  if (error) return null;
-  return { path, mime: file.type || fallbackMime };
+  try {
+    const supabase = getSupabaseAdmin();
+    const fallbackMime = type === 'pdf' ? 'application/pdf' : 'application/octet-stream';
+    const ext = (file.name.split('.').pop() || (type === 'pdf' ? 'pdf' : 'bin')).toLowerCase();
+    const path = `${type}/${shortId(12)}.${ext}`;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { error } = await supabase.storage.from('content').upload(path, bytes, {
+      contentType: file.type || fallbackMime,
+      upsert: true,
+    });
+    if (error) {
+      console.error('content upload failed:', error.message);
+      return null;
+    }
+    return { path, mime: file.type || fallbackMime };
+  } catch (err) {
+    console.error('content upload threw:', err);
+    return null;
+  }
 }
 
 /** Build the type-specific payload columns from the submitted form. */
@@ -42,6 +50,15 @@ export async function createLink(formData: FormData) {
   const supabase = getSupabaseAdmin();
   const type = (String(formData.get('type') ?? 'link') || 'link') as ContentType;
 
+  // Append new elements at the end of the current order.
+  const { data: maxRow } = await supabase
+    .from('links')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((maxRow as { sort_order: number } | null)?.sort_order ?? 0) + 1;
+
   const row: Record<string, unknown> = {
     type,
     label: String(formData.get('label') ?? '').trim(),
@@ -49,6 +66,7 @@ export async function createLink(formData: FormData) {
     icon: String(formData.get('icon') ?? defaultIconFor(type)),
     storage_path: null,
     mime: null,
+    sort_order: nextOrder,
     ...payloadForType(type, formData),
   };
 
@@ -149,6 +167,36 @@ export async function deleteLink(formData: FormData) {
   }
   revalidatePath('/admin/links');
   redirect('/admin/links?deleted=1');
+}
+
+/** Move a content element up or down in the global display order. */
+export async function moveLink(formData: FormData) {
+  await requireSession();
+  const supabase = getSupabaseAdmin();
+  const id = String(formData.get('id') ?? '');
+  const dir = String(formData.get('dir') ?? '');
+  if (!id || (dir !== 'up' && dir !== 'down')) redirect('/admin/links');
+
+  const { data } = await supabase.from('links').select('id, sort_order').order('sort_order').order('created_at');
+  const list = (data as { id: string; sort_order: number }[]) ?? [];
+  const idx = list.findIndex((l) => l.id === id);
+  if (idx === -1) redirect('/admin/links');
+
+  const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= list.length) redirect('/admin/links'); // already at the edge
+
+  const a = list[idx];
+  const b = list[swapIdx];
+  // Swap their order values (use distinct values in case of ties).
+  await supabase.from('links').update({ sort_order: b.sort_order }).eq('id', a.id);
+  await supabase.from('links').update({ sort_order: a.sort_order }).eq('id', b.id);
+  if (a.sort_order === b.sort_order) {
+    // Tie-break: nudge one so the order is deterministic next time.
+    await supabase.from('links').update({ sort_order: a.sort_order + (dir === 'up' ? -1 : 1) }).eq('id', a.id);
+  }
+
+  revalidatePath('/admin/links');
+  redirect('/admin/links');
 }
 
 /** Set the vehicle-scoped link placements for a single vehicle. */
