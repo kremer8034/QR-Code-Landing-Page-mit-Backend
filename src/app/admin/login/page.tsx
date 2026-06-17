@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, countAdminUsers } from '@/lib/auth';
+import { validateSession, countAdminUsers } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { loginAction } from '../auth-actions';
@@ -31,7 +31,7 @@ export default async function LoginPage({
     );
   }
 
-  const session = await getSession();
+  const session = await validateSession();
   if (session) redirect('/admin');
 
   const users = await countAdminUsers().catch(() => -1);

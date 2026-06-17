@@ -4,9 +4,11 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/guard';
+import { isUuid } from '@/lib/validate';
 
 /** Build the ordered list of content elements shown for a group (global + group). */
 async function groupOrderedLinkIds(groupId: string): Promise<string[]> {
+  if (!isUuid(groupId)) return [];
   const supabase = getSupabaseAdmin();
   const { data: placements } = await supabase
     .from('link_placements')
@@ -44,7 +46,7 @@ export async function moveGroupLink(formData: FormData) {
   const groupId = String(formData.get('group_id') ?? '');
   const linkId = String(formData.get('link_id') ?? '');
   const dir = String(formData.get('dir') ?? '');
-  if (!groupId || !linkId || (dir !== 'up' && dir !== 'down')) redirect('/admin/groups');
+  if (!isUuid(groupId) || !isUuid(linkId) || (dir !== 'up' && dir !== 'down')) redirect('/admin/groups');
 
   const ordered = await groupOrderedLinkIds(groupId);
   const idx = ordered.indexOf(linkId);

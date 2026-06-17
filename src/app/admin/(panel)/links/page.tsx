@@ -61,6 +61,7 @@ export default async function LinksPage({
       {sp.saved ? <div className="mb-4"><Alert kind="success">Gespeichert.</Alert></div> : null}
       {sp.deleted ? <div className="mb-4"><Alert kind="success">Element gelöscht.</Alert></div> : null}
       {sp.error === 'create' ? <div className="mb-4"><Alert kind="error">Konnte nicht gespeichert werden. Bitte Eingaben/Datei prüfen.</Alert></div> : null}
+      {sp.error === 'url' ? <div className="mb-4"><Alert kind="error">Bitte eine gültige Web-Adresse angeben (http:// oder https://).</Alert></div> : null}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* New element */}

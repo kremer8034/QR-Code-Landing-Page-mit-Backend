@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { recordScan } from '@/lib/queries';
+import { isUuid } from '@/lib/validate';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const vehicleId = typeof body.vehicleId === 'string' ? body.vehicleId : null;
-    if (!vehicleId) return new Response('bad request', { status: 400 });
+    if (!vehicleId || !isUuid(vehicleId)) return new Response('bad request', { status: 400 });
 
     const ua = request.headers.get('user-agent') ?? undefined;
     const referrer = request.headers.get('referer') ?? undefined;

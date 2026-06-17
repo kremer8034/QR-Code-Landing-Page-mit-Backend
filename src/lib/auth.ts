@@ -79,6 +79,29 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
+/**
+ * Verify the session cookie AND re-check the user against the database, so that
+ * deleted/deactivated accounts lose access immediately and role changes take
+ * effect without re-login. Returns the authoritative session user, or null.
+ */
+export async function validateSession(): Promise<SessionUser | null> {
+  const session = await getSession();
+  if (!session) return null;
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('admin_users')
+      .select('id, email, name, role, active')
+      .eq('id', session.id)
+      .maybeSingle();
+    const u = data as { id: string; email: string; name: string; role: SessionUser['role']; active: boolean } | null;
+    if (!u || !u.active) return null;
+    return { id: u.id, email: u.email, name: u.name, role: u.role };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // User lookup helpers
 // ---------------------------------------------------------------------------

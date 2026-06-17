@@ -10,11 +10,11 @@ import type { AdminUser, IconItem } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-const TABS = [
+const TABS: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: 'branding', label: 'Darstellung' },
-  { key: 'email', label: 'E-Mail' },
-  { key: 'sso', label: 'BRK.id / SSO' },
-  { key: 'users', label: 'Benutzer' },
+  { key: 'email', label: 'E-Mail', adminOnly: true },
+  { key: 'sso', label: 'BRK.id / SSO', adminOnly: true },
+  { key: 'users', label: 'Benutzer', adminOnly: true },
   { key: 'icons', label: 'Symbole' },
 ];
 
@@ -25,12 +25,18 @@ export default async function SettingsPage({
 }) {
   const sp = await searchParams;
   const session = await requireSession();
-  const tab = sp.tab ?? 'branding';
+  const isAdmin = session.role === 'admin';
+  const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+  const requestedTab = sp.tab ?? 'branding';
+  // Non-admins may only see non-admin tabs.
+  const tab = visibleTabs.some((t) => t.key === requestedTab) ? requestedTab : 'branding';
   const settings = await getSettings();
   const supabase = getSupabaseAdmin();
 
-  const { data: users } = await supabase.from('admin_users').select('*').order('created_at');
-  const userList = (users as AdminUser[]) ?? [];
+  // Only admins see the user list; editors never receive it.
+  const userList = isAdmin
+    ? (((await supabase.from('admin_users').select('*').order('created_at')).data as AdminUser[]) ?? [])
+    : [];
   const { data: icons } = await supabase.from('icons').select('*').order('created_at', { ascending: false });
   const iconList = (icons as IconItem[]) ?? [];
 
@@ -45,7 +51,7 @@ export default async function SettingsPage({
       {sp.error === 'user' ? <div className="mb-4"><Alert kind="error">Bitte gültige E-Mail und Passwort (min. 8 Zeichen) angeben.</Alert></div> : null}
 
       <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <Link
             key={t.key}
             href={`/admin/settings?tab=${t.key}`}

@@ -107,13 +107,38 @@ export async function importVehicles(formData: FormData) {
 
   const supabase = getSupabaseAdmin();
 
-  // Map group names -> ids, creating missing groups.
+  // Map group names -> ids, creating missing groups in one batch.
   const { data: existingGroups } = await supabase.from('groups').select('id, name');
   const groupMap = new Map<string, string>(
     (existingGroups as { id: string; name: string }[] ?? []).map((g) => [g.name.toLowerCase(), g.id]),
   );
 
-  let created = 0;
+  const wantedGroups = new Map<string, string>(); // key -> original name
+  for (const row of rows) {
+    const g = pick(row, ['gruppe', 'group', 'abteilung']);
+    if (g && !groupMap.has(g.toLowerCase())) wantedGroups.set(g.toLowerCase(), g);
+  }
+  if (wantedGroups.size) {
+    const { data: newGroups } = await supabase
+      .from('groups')
+      .insert([...wantedGroups.values()].map((name) => ({ name })))
+      .select('id, name');
+    for (const g of (newGroups as { id: string; name: string }[] ?? [])) {
+      groupMap.set(g.name.toLowerCase(), g.id);
+    }
+  }
+
+  // Generate unique public_ids in memory (one query for existing ids).
+  const { data: existingVeh } = await supabase.from('vehicles').select('public_id');
+  const usedIds = new Set<string>((existingVeh as { public_id: string }[] ?? []).map((v) => v.public_id));
+  const freshId = (): string => {
+    let id = shortId(8);
+    while (usedIds.has(id)) id = shortId(8);
+    usedIds.add(id);
+    return id;
+  };
+
+  const toInsert: Record<string, unknown>[] = [];
   let skipped = 0;
   for (const row of rows) {
     const plate = pick(row, ['kennzeichen', 'license_plate', 'kfz-kennzeichen', 'kfz', 'plate']);
@@ -123,31 +148,24 @@ export async function importVehicles(formData: FormData) {
       continue;
     }
     const groupName = pick(row, ['gruppe', 'group', 'abteilung']);
-    let groupId: string | null = null;
-    if (groupName) {
-      const key = groupName.toLowerCase();
-      if (groupMap.has(key)) {
-        groupId = groupMap.get(key)!;
-      } else {
-        const { data: ng } = await supabase.from('groups').insert({ name: groupName }).select('id').single();
-        if (ng) {
-          groupId = ng.id;
-          groupMap.set(key, ng.id);
-        }
-      }
-    }
-
-    const public_id = await uniquePublicId();
-    const { error } = await supabase.from('vehicles').insert({
-      public_id,
+    const groupId = groupName ? groupMap.get(groupName.toLowerCase()) ?? null : null;
+    toInsert.push({
+      public_id: freshId(),
       license_plate: plate,
       name,
       vin: pick(row, ['vin', 'fin', 'fahrgestellnummer']),
       notes: pick(row, ['notiz', 'notes', 'bemerkung', 'kommentar']),
       group_id: groupId,
     });
-    if (error) skipped++;
-    else created++;
+  }
+
+  let created = 0;
+  // Insert in chunks to keep each request small.
+  for (let i = 0; i < toInsert.length; i += 200) {
+    const chunk = toInsert.slice(i, i + 200);
+    const { data, error } = await supabase.from('vehicles').insert(chunk).select('id');
+    if (error) skipped += chunk.length;
+    else created += (data as unknown[])?.length ?? chunk.length;
   }
 
   revalidatePath('/admin/vehicles');

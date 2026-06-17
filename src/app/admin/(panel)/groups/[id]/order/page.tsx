@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { Alert, Card, CardBody, LinkButton, PageHeader } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { contentPreview, contentTypeMeta } from '@/lib/content';
+import { isUuid } from '@/lib/validate';
 import { moveGroupLink } from '../../actions';
 import type { Group, LinkItem, LinkPlacement } from '@/lib/types';
 
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function GroupOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const supabase = getSupabaseAdmin();
 
   const { data: groupData } = await supabase.from('groups').select('*').eq('id', id).maybeSingle();

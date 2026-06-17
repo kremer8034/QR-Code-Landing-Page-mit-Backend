@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/guard';
 import { shortId } from '@/lib/ids';
 import { defaultIconFor } from '@/lib/content';
+import { isUuid, sanitizeWebUrl } from '@/lib/validate';
 import type { ContentType } from '@/lib/types';
 
 const FILE_TYPES: ContentType[] = ['pdf', 'image'];
@@ -36,10 +37,20 @@ async function uploadContentFile(
   }
 }
 
-/** Build the type-specific payload columns from the submitted form. */
-function payloadForType(type: ContentType, formData: FormData) {
+/**
+ * Build the type-specific payload columns from the submitted form.
+ * Returns null when a link URL is present but invalid/unsafe.
+ */
+function payloadForType(type: ContentType, formData: FormData):
+  | { url: string | null; value: string | null; body: string | null }
+  | { invalid: 'url' } {
+  let url: string | null = null;
+  if (type === 'link') {
+    url = sanitizeWebUrl(String(formData.get('url') ?? ''));
+    if (!url) return { invalid: 'url' }; // empty or dangerous scheme (e.g. javascript:)
+  }
   return {
-    url: type === 'link' ? String(formData.get('url') ?? '').trim() : null,
+    url,
     value: ['phone', 'email', 'address'].includes(type) ? String(formData.get('value') ?? '').trim() : null,
     body: type === 'text' ? String(formData.get('body') ?? '').trim() : null,
   };
@@ -59,6 +70,9 @@ export async function createLink(formData: FormData) {
     .maybeSingle();
   const nextOrder = ((maxRow as { sort_order: number } | null)?.sort_order ?? 0) + 1;
 
+  const payload = payloadForType(type, formData);
+  if ('invalid' in payload) redirect('/admin/links?error=url');
+
   const row: Record<string, unknown> = {
     type,
     label: String(formData.get('label') ?? '').trim(),
@@ -67,7 +81,7 @@ export async function createLink(formData: FormData) {
     storage_path: null,
     mime: null,
     sort_order: nextOrder,
-    ...payloadForType(type, formData),
+    ...payload,
   };
 
   if (FILE_TYPES.includes(type)) {
@@ -93,13 +107,16 @@ export async function updateLink(formData: FormData) {
   if (!id) redirect('/admin/links');
   const type = (String(formData.get('type') ?? 'link') || 'link') as ContentType;
 
+  const payload = payloadForType(type, formData);
+  if ('invalid' in payload) redirect('/admin/links?error=url');
+
   const patch: Record<string, unknown> = {
     type,
     label: String(formData.get('label') ?? '').trim(),
     description: String(formData.get('description') ?? '').trim(),
     icon: String(formData.get('icon') ?? defaultIconFor(type)),
     updated_at: new Date().toISOString(),
-    ...payloadForType(type, formData),
+    ...payload,
   };
 
   if (FILE_TYPES.includes(type)) {

@@ -1,17 +1,18 @@
 import { redirect } from 'next/navigation';
-import { getSession, countAdminUsers } from './auth';
+import { validateSession, countAdminUsers } from './auth';
 import { isSupabaseConfigured } from './supabase';
 import type { SessionUser } from './types';
 
 /**
  * Guard for backoffice pages. Redirects to setup (if no users yet) or login.
- * Returns the authenticated session user when access is allowed.
+ * Returns the authenticated session user when access is allowed. The session is
+ * re-validated against the database on every call.
  */
 export async function requireSession(): Promise<SessionUser> {
   if (!isSupabaseConfigured()) {
     redirect('/admin/login?error=config');
   }
-  const session = await getSession();
+  const session = await validateSession();
   if (!session) {
     let users = 0;
     try {

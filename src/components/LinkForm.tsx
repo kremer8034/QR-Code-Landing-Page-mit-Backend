@@ -107,9 +107,21 @@ export function LinkForm({
           setBusy(false);
           return;
         }
-        const dt = new DataTransfer();
-        dt.items.add(prepared);
-        fileInput!.files = dt.files;
+        // Swap the compressed file into the input. If DataTransfer is not
+        // available (older browsers), fall back to the original file when it is
+        // already small enough.
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(prepared);
+          fileInput!.files = dt.files;
+        } catch {
+          if (file.size > MAX_UPLOAD_BYTES) {
+            setError('Das Bild ist zu groß (max. 4 MB) und konnte im Browser nicht verkleinert werden.');
+            setBusy(false);
+            return;
+          }
+          // else: keep the original (small) file already in the input
+        }
         preparedRef.current = true;
         form.requestSubmit();
       } catch {
