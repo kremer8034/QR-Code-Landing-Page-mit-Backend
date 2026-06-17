@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Field, Input, Textarea, Select, Alert } from '@/components/ui';
 import { IconPicker } from '@/components/IconPicker';
 import { VehiclePicker } from '@/components/VehiclePicker';
@@ -82,6 +82,7 @@ export function LinkForm({
   const [type, setType] = useState<ContentType>(initial?.type ?? 'link');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const preparedRef = useRef(false);
 
   const isButtonType = ['link', 'pdf', 'phone', 'email', 'address'].includes(type);
 
@@ -93,9 +94,9 @@ export function LinkForm({
     const fileInput = form.querySelector<HTMLInputElement>('input[name="file"]');
     const file = fileInput?.files?.[0];
 
-    // Images: compress in the browser before sending (keeps payload small and
-    // avoids the server upload-size limit). Submit programmatically.
-    if (type === 'image' && file) {
+    // Images: compress in the browser first, swap the file into the input, then
+    // submit natively so Next.js handles the action's redirect correctly.
+    if (type === 'image' && file && !preparedRef.current) {
       e.preventDefault();
       setError(null);
       setBusy(true);
@@ -106,11 +107,13 @@ export function LinkForm({
           setBusy(false);
           return;
         }
-        const fd = new FormData(form);
-        fd.set('file', prepared);
-        await (action(fd) as unknown as Promise<void>);
+        const dt = new DataTransfer();
+        dt.items.add(prepared);
+        fileInput!.files = dt.files;
+        preparedRef.current = true;
+        form.requestSubmit();
       } catch {
-        setError('Beim Hochladen ist ein Fehler aufgetreten. Bitte erneut versuchen.');
+        setError('Das Bild konnte nicht verarbeitet werden. Bitte ein anderes Bild versuchen.');
         setBusy(false);
       }
       return;
@@ -118,7 +121,7 @@ export function LinkForm({
 
     // PDFs (and other files) can't be compressed — guard the size up front so
     // the user gets a clear message instead of a failed request.
-    if (file && file.size > MAX_UPLOAD_BYTES) {
+    if (file && type !== 'image' && file.size > MAX_UPLOAD_BYTES) {
       e.preventDefault();
       setError('Die Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.');
       return;
