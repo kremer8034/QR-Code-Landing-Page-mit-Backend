@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import { getVehicleByPublicId, resolveVehicleLinks } from '@/lib/queries';
 import { getSettings, themeStyle } from '@/lib/settings';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { Icon } from '@/components/Icon';
 import { LandingClient } from './LandingClient';
+import { ContentList } from './ContentList';
 import type { Group } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -78,36 +78,9 @@ export default async function VehicleLanding({
           </div>
         </header>
 
-        {/* Link buttons */}
-        <nav className="flex flex-col gap-3">
-          {links.length === 0 ? (
-            <p className="text-center text-gray-500 py-10">
-              Für dieses Fahrzeug sind noch keine Links hinterlegt.
-            </p>
-          ) : (
-            links.map(({ link }) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center gap-4 rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 px-4 py-4 active:scale-[0.99] transition-transform"
-              >
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                  style={{ background: 'var(--brand)', color: 'var(--brand-fg)' }}
-                >
-                  <Icon icon={link.icon} size={24} />
-                </span>
-                <span className="flex flex-col text-left">
-                  <span className="font-semibold text-gray-900">{link.label}</span>
-                  {link.description ? (
-                    <span className="text-sm text-gray-500">{link.description}</span>
-                  ) : null}
-                </span>
-              </a>
-            ))
-          )}
+        {/* Content elements */}
+        <nav>
+          <ContentList items={links} publicId={vehicle.public_id} />
         </nav>
 
         <footer className="mt-10 text-center text-xs text-gray-400">

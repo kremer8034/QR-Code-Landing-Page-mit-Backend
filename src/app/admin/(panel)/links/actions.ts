@@ -4,20 +4,63 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/guard';
+import { shortId } from '@/lib/ids';
+import { defaultIconFor } from '@/lib/content';
+import type { ContentType } from '@/lib/types';
+
+const FILE_TYPES: ContentType[] = ['pdf', 'image'];
+
+async function uploadContentFile(
+  file: FormDataEntryValue | null,
+  type: ContentType,
+): Promise<{ path: string; mime: string } | null> {
+  if (!(file instanceof File) || file.size === 0) return null;
+  const supabase = getSupabaseAdmin();
+  const fallbackMime = type === 'pdf' ? 'application/pdf' : 'application/octet-stream';
+  const ext = (file.name.split('.').pop() || (type === 'pdf' ? 'pdf' : 'bin')).toLowerCase();
+  const path = `${type}/${shortId(12)}.${ext}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const { error } = await supabase.storage.from('content').upload(path, bytes, {
+    contentType: file.type || fallbackMime,
+    upsert: true,
+  });
+  if (error) return null;
+  return { path, mime: file.type || fallbackMime };
+}
+
+/** Build the type-specific payload columns from the submitted form. */
+function payloadForType(type: ContentType, formData: FormData) {
+  return {
+    url: type === 'link' ? String(formData.get('url') ?? '').trim() : null,
+    value: ['phone', 'email', 'address'].includes(type) ? String(formData.get('value') ?? '').trim() : null,
+    body: type === 'text' ? String(formData.get('body') ?? '').trim() : null,
+  };
+}
 
 export async function createLink(formData: FormData) {
   await requireSession();
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from('links')
-    .insert({
-      label: String(formData.get('label') ?? '').trim(),
-      url: String(formData.get('url') ?? '').trim(),
-      description: String(formData.get('description') ?? '').trim(),
-      icon: String(formData.get('icon') ?? 'lucide:Link'),
-    })
-    .select('id')
-    .single();
+  const type = (String(formData.get('type') ?? 'link') || 'link') as ContentType;
+
+  const row: Record<string, unknown> = {
+    type,
+    label: String(formData.get('label') ?? '').trim(),
+    description: String(formData.get('description') ?? '').trim(),
+    icon: String(formData.get('icon') ?? defaultIconFor(type)),
+    storage_path: null,
+    mime: null,
+    ...payloadForType(type, formData),
+  };
+
+  if (FILE_TYPES.includes(type)) {
+    const uploaded = await uploadContentFile(formData.get('file'), type);
+    if (uploaded) {
+      row.storage_path = uploaded.path;
+      row.mime = uploaded.mime;
+    }
+  }
+
+  const { data, error } = await supabase.from('links').insert(row).select('id').single();
   if (error || !data) redirect('/admin/links?error=create');
 
   await applyScopes(data.id, formData);
@@ -30,17 +73,38 @@ export async function updateLink(formData: FormData) {
   const supabase = getSupabaseAdmin();
   const id = String(formData.get('id') ?? '');
   if (!id) redirect('/admin/links');
+  const type = (String(formData.get('type') ?? 'link') || 'link') as ContentType;
 
-  await supabase
-    .from('links')
-    .update({
-      label: String(formData.get('label') ?? '').trim(),
-      url: String(formData.get('url') ?? '').trim(),
-      description: String(formData.get('description') ?? '').trim(),
-      icon: String(formData.get('icon') ?? 'lucide:Link'),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
+  const patch: Record<string, unknown> = {
+    type,
+    label: String(formData.get('label') ?? '').trim(),
+    description: String(formData.get('description') ?? '').trim(),
+    icon: String(formData.get('icon') ?? defaultIconFor(type)),
+    updated_at: new Date().toISOString(),
+    ...payloadForType(type, formData),
+  };
+
+  if (FILE_TYPES.includes(type)) {
+    const uploaded = await uploadContentFile(formData.get('file'), type);
+    if (uploaded) {
+      // Remove the previous file if a new one replaces it.
+      const { data: old } = await supabase.from('links').select('storage_path').eq('id', id).maybeSingle();
+      const oldPath = (old as { storage_path: string | null } | null)?.storage_path;
+      if (oldPath && oldPath !== uploaded.path) await supabase.storage.from('content').remove([oldPath]);
+      patch.storage_path = uploaded.path;
+      patch.mime = uploaded.mime;
+    }
+    // else keep the existing file (storage_path/mime untouched).
+  } else {
+    // Switched to a non-file type: drop any stored file reference.
+    const { data: old } = await supabase.from('links').select('storage_path').eq('id', id).maybeSingle();
+    const oldPath = (old as { storage_path: string | null } | null)?.storage_path;
+    if (oldPath) await supabase.storage.from('content').remove([oldPath]);
+    patch.storage_path = null;
+    patch.mime = null;
+  }
+
+  await supabase.from('links').update(patch).eq('id', id);
 
   await applyScopes(id, formData);
   revalidatePath('/admin/links');
@@ -75,8 +139,14 @@ async function applyScopes(linkId: string, formData: FormData) {
 
 export async function deleteLink(formData: FormData) {
   await requireSession();
+  const supabase = getSupabaseAdmin();
   const id = String(formData.get('id') ?? '');
-  if (id) await getSupabaseAdmin().from('links').delete().eq('id', id);
+  if (id) {
+    const { data } = await supabase.from('links').select('storage_path').eq('id', id).maybeSingle();
+    const path = (data as { storage_path: string | null } | null)?.storage_path;
+    if (path) await supabase.storage.from('content').remove([path]);
+    await supabase.from('links').delete().eq('id', id);
+  }
   revalidatePath('/admin/links');
   redirect('/admin/links?deleted=1');
 }

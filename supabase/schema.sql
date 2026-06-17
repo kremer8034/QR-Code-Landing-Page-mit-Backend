@@ -72,8 +72,14 @@ create index if not exists vehicles_group_idx on public.vehicles(group_id);
 
 create table if not exists public.links (
   id          uuid primary key default gen_random_uuid(),
+  type        text not null default 'link'
+    check (type in ('link','pdf','phone','email','address','text','image')),
   label       text not null,
-  url         text not null,
+  url         text,           -- only for type 'link'
+  value       text,           -- phone / email / address
+  body        text,           -- info text block
+  storage_path text,          -- pdf / image file path (private 'content' bucket)
+  mime        text,           -- uploaded file mime type
   description text not null default '',
   icon        text not null default 'lucide:Link',
   created_at  timestamptz not null default now(),
@@ -128,5 +134,10 @@ alter table public.icons           enable row level security;
 alter table public.scans           enable row level security;
 
 -- Storage buckets (run once):
--- insert into storage.buckets (id, name, public) values ('branding','branding',true), ('icons','icons',true)
+-- Public buckets for logo + custom icons; private bucket for uploaded
+-- documents/images (streamed inline by the app).
+-- insert into storage.buckets (id, name, public) values
+--   ('branding','branding',true), ('icons','icons',true)
 --   on conflict (id) do update set public = true;
+-- insert into storage.buckets (id, name, public) values ('content','content',false)
+--   on conflict (id) do nothing;

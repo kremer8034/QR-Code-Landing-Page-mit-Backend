@@ -1,9 +1,9 @@
 import { getSupabaseAdmin, supabasePublicUrl } from '@/lib/supabase';
-import { Alert, Button, Card, CardBody, Field, Input, PageHeader, Textarea } from '@/components/ui';
+import { Alert, Card, CardBody, PageHeader } from '@/components/ui';
 import { Icon } from '@/components/Icon';
-import { IconPicker } from '@/components/IconPicker';
+import { LinkForm } from '@/components/LinkForm';
 import { ICON_TEMPLATES } from '@/lib/icons';
-import { VehiclePicker } from '@/components/VehiclePicker';
+import { contentPreview, contentTypeMeta } from '@/lib/content';
 import { createLink, updateLink, deleteLink } from './actions';
 import type { Group, IconItem, LinkItem, LinkPlacement, Vehicle } from '@/lib/types';
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default async function LinksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; deleted?: string }>;
+  searchParams: Promise<{ saved?: string; deleted?: string; error?: string }>;
 }) {
   const sp = await searchParams;
   const supabase = getSupabaseAdmin();
@@ -42,123 +42,97 @@ export default async function LinksPage({
     sub: [v.name, v.group_id ? groupNameMap.get(v.group_id) : null].filter(Boolean).join(' · '),
   }));
 
+  const groupOptions = groupList.map((g) => ({ id: g.id, name: g.name }));
+
   const isGlobal = (linkId: string) => allPlacements.some((p) => p.link_id === linkId && p.scope === 'global');
   const linkGroups = (linkId: string) =>
-    new Set(allPlacements.filter((p) => p.link_id === linkId && p.scope === 'group').map((p) => p.group_id));
+    allPlacements.filter((p) => p.link_id === linkId && p.scope === 'group' && p.group_id).map((p) => p.group_id as string);
   const linkVehicles = (linkId: string) =>
     allPlacements.filter((p) => p.link_id === linkId && p.scope === 'vehicle' && p.vehicle_id).map((p) => p.vehicle_id as string);
-
-  function GroupChecks({ selected }: { selected: Set<string | null> }) {
-    if (groupList.length === 0) return <p className="text-xs text-gray-400">Keine Gruppen vorhanden.</p>;
-    return (
-      <div className="grid grid-cols-2 gap-1.5">
-        {groupList.map((g) => (
-          <label key={g.id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="group_ids" value={g.id} defaultChecked={selected.has(g.id)} className="h-4 w-4" />
-            <span className="truncate">{g.name}</span>
-          </label>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div>
       <PageHeader
-        title="Links"
-        subtitle="Zentrale Link-Bibliothek. Eine Änderung wirkt sofort auf allen zugeordneten Landingpages."
+        title="Inhalte & Links"
+        subtitle="Zentrale Bibliothek. Eine Änderung wirkt sofort auf allen zugeordneten Landingpages."
       />
 
       {sp.saved ? <div className="mb-4"><Alert kind="success">Gespeichert.</Alert></div> : null}
-      {sp.deleted ? <div className="mb-4"><Alert kind="success">Link gelöscht.</Alert></div> : null}
+      {sp.deleted ? <div className="mb-4"><Alert kind="success">Element gelöscht.</Alert></div> : null}
+      {sp.error === 'create' ? <div className="mb-4"><Alert kind="error">Konnte nicht gespeichert werden. Bitte Eingaben/Datei prüfen.</Alert></div> : null}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* New link */}
+        {/* New element */}
         <Card className="lg:col-span-1 h-fit">
           <CardBody className="p-6">
-            <h2 className="font-bold text-gray-900 mb-4">Neuer Link</h2>
-            <form action={createLink} className="space-y-4">
-              <Field label="Bezeichnung">
-                <Input name="label" required placeholder="z. B. Digitaler Fahrzeugcheck" />
-              </Field>
-              <Field label="URL">
-                <Input name="url" type="url" required placeholder="https://…" />
-              </Field>
-              <Field label="Beschreibung (optional)">
-                <Input name="description" placeholder="Kurztext unter dem Button" />
-              </Field>
-              <Field label="Symbol">
-                <IconPicker name="icon" templates={ICON_TEMPLATES} customIcons={customIcons} />
-              </Field>
-              <div className="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input type="checkbox" name="scope_global" className="h-4 w-4" />
-                  Auf <strong>allen</strong> Landingpages anzeigen
-                </label>
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Für Gruppen</div>
-                  <GroupChecks selected={new Set()} />
-                </div>
-                <VehiclePicker name="vehicle_ids" vehicles={vehicleOptions} selected={[]} />
-              </div>
-              <Button type="submit">Link anlegen</Button>
-            </form>
+            <h2 className="font-bold text-gray-900 mb-4">Neues Element</h2>
+            <LinkForm
+              action={createLink}
+              submitLabel="Element anlegen"
+              templates={ICON_TEMPLATES}
+              customIcons={customIcons}
+              groups={groupOptions}
+              vehicles={vehicleOptions}
+              selectedGroups={[]}
+              selectedVehicles={[]}
+              isGlobal={false}
+            />
           </CardBody>
         </Card>
 
-        {/* Existing links */}
+        {/* Existing elements */}
         <div className="lg:col-span-2 space-y-3">
           {linkList.length === 0 ? (
-            <Card><CardBody><p className="text-gray-500 text-center py-6">Noch keine Links.</p></CardBody></Card>
+            <Card><CardBody><p className="text-gray-500 text-center py-6">Noch keine Inhalte.</p></CardBody></Card>
           ) : (
             linkList.map((l) => (
               <Card key={l.id}>
                 <CardBody className="p-5">
                   <details>
                     <summary className="flex items-center gap-3 cursor-pointer list-none">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--brand)', color: 'var(--brand-fg)' }}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'var(--brand)', color: 'var(--brand-fg)' }}>
                         <Icon icon={l.icon} size={20} />
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="font-semibold text-gray-900 block">{l.label}</span>
-                        <span className="text-xs text-gray-400 truncate block">{l.url}</span>
+                        <span className="font-semibold text-gray-900 block truncate">{l.label || contentTypeMeta(l.type).label}</span>
+                        <span className="text-xs text-gray-400 truncate block">{contentPreview(l)}</span>
                       </span>
-                      <span className="flex gap-1">
+                      <span className="flex flex-wrap gap-1 justify-end shrink-0">
+                        <span className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">{contentTypeMeta(l.type).label}</span>
                         {isGlobal(l.id) ? <span className="text-xs rounded-full bg-green-100 text-green-700 px-2 py-0.5">global</span> : null}
-                        {linkGroups(l.id).size > 0 ? <span className="text-xs rounded-full bg-blue-100 text-blue-700 px-2 py-0.5">{linkGroups(l.id).size} Gruppe(n)</span> : null}
+                        {linkGroups(l.id).length > 0 ? <span className="text-xs rounded-full bg-blue-100 text-blue-700 px-2 py-0.5">{linkGroups(l.id).length} Gruppe(n)</span> : null}
                         {linkVehicles(l.id).length > 0 ? <span className="text-xs rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">{linkVehicles(l.id).length} Fahrzeug(e)</span> : null}
                       </span>
                     </summary>
 
-                    <form action={updateLink} className="space-y-4 mt-4 pt-4 border-t border-gray-100">
-                      <input type="hidden" name="id" value={l.id} />
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        <Field label="Bezeichnung"><Input name="label" defaultValue={l.label} required /></Field>
-                        <Field label="URL"><Input name="url" type="url" defaultValue={l.url} required /></Field>
-                      </div>
-                      <Field label="Beschreibung"><Input name="description" defaultValue={l.description} /></Field>
-                      <Field label="Symbol">
-                        <IconPicker name="icon" defaultValue={l.icon} templates={ICON_TEMPLATES} customIcons={customIcons} />
-                      </Field>
-                      <div className="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3 space-y-3">
-                        <label className="flex items-center gap-2 text-sm font-medium">
-                          <input type="checkbox" name="scope_global" defaultChecked={isGlobal(l.id)} className="h-4 w-4" />
-                          Auf <strong>allen</strong> Landingpages anzeigen
-                        </label>
-                        <div>
-                          <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Für Gruppen</div>
-                          <GroupChecks selected={linkGroups(l.id)} />
-                        </div>
-                        <VehiclePicker name="vehicle_ids" vehicles={vehicleOptions} selected={linkVehicles(l.id)} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Button type="submit" variant="ghost">Speichern</Button>
-                      </div>
-                    </form>
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <LinkForm
+                        action={updateLink}
+                        submitLabel="Speichern"
+                        templates={ICON_TEMPLATES}
+                        customIcons={customIcons}
+                        groups={groupOptions}
+                        vehicles={vehicleOptions}
+                        initial={{
+                          id: l.id,
+                          type: l.type,
+                          label: l.label,
+                          description: l.description,
+                          url: l.url ?? '',
+                          value: l.value ?? '',
+                          body: l.body ?? '',
+                          icon: l.icon,
+                          hasFile: Boolean(l.storage_path),
+                        }}
+                        selectedGroups={linkGroups(l.id)}
+                        selectedVehicles={linkVehicles(l.id)}
+                        isGlobal={isGlobal(l.id)}
+                      />
+                    </div>
 
                     <form action={deleteLink} className="mt-2">
                       <input type="hidden" name="id" value={l.id} />
-                      <button className="text-sm text-red-600 hover:underline">Link löschen</button>
+                      <button className="text-sm text-red-600 hover:underline">Element löschen</button>
                     </form>
                   </details>
                 </CardBody>

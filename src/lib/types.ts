@@ -1,5 +1,6 @@
 export type Role = 'admin' | 'editor';
 export type PlacementScope = 'global' | 'group' | 'vehicle';
+export type ContentType = 'link' | 'pdf' | 'phone' | 'email' | 'address' | 'text' | 'image';
 
 export interface Settings {
   id: number;
@@ -66,8 +67,13 @@ export interface Vehicle {
 
 export interface LinkItem {
   id: string;
+  type: ContentType;
   label: string;
-  url: string;
+  url: string | null;
+  value: string | null;
+  body: string | null;
+  storage_path: string | null;
+  mime: string | null;
   description: string;
   icon: string;
   created_at: string;

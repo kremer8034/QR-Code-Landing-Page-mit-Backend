@@ -8,6 +8,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { CopyField } from '@/components/CopyField';
+import { contentPreview } from '@/lib/content';
 import { Download, ExternalLink, ImageIcon, Printer } from 'lucide-react';
 import { updateVehicle, deleteVehicle } from '../actions';
 import { setVehiclePlacements } from '../../links/actions';
@@ -165,7 +166,7 @@ export default async function VehicleEditPage({
                         <span className="shrink-0"><Icon icon={l.icon} size={18} /></span>
                         <span className="flex-1 min-w-0">
                           <span className="block font-medium text-gray-900 truncate">{l.label}</span>
-                          <span className="block text-xs text-gray-400 truncate">{l.url}</span>
+                          <span className="block text-xs text-gray-400 truncate">{contentPreview(l)}</span>
                         </span>
                       </label>
                     ))}
