@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #e2001a;
+  --brand-fg: #ffffff;
+  --brand-dark: #b80016;
+  --accent: #222222;
+  --accent-fg: #ffffff;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.btn-brand {
+  background: var(--brand);
+  color: var(--brand-fg);
+}
+.btn-brand:hover {
+  background: var(--brand-dark);
+}
