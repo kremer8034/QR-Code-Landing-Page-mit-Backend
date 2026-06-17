@@ -21,6 +21,12 @@ create table if not exists public.settings (
   oidc_button_label   text not null default 'Anmelden mit BRK.id',
   oidc_auto_create    boolean not null default false,
   oidc_allowed_domains text,
+  smtp_host       text,
+  smtp_port       integer not null default 587,
+  smtp_secure     boolean not null default false,
+  smtp_user       text,
+  smtp_password   text,
+  smtp_from       text,
   updated_at      timestamptz not null default now()
 );
 insert into public.settings (id) values (1) on conflict (id) do nothing;
@@ -36,8 +42,11 @@ create table if not exists public.admin_users (
   oidc_sub      text unique,
   active        boolean not null default true,
   created_at    timestamptz not null default now(),
-  last_login    timestamptz
+  last_login    timestamptz,
+  reset_token_hash text,
+  reset_expires    timestamptz
 );
+create index if not exists admin_users_reset_idx on public.admin_users(reset_token_hash);
 
 create table if not exists public.groups (
   id          uuid primary key default gen_random_uuid(),

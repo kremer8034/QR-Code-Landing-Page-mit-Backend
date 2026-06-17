@@ -18,6 +18,12 @@ export const DEFAULT_SETTINGS: Settings = {
   oidc_button_label: 'Anmelden mit BRK.id',
   oidc_auto_create: false,
   oidc_allowed_domains: null,
+  smtp_host: null,
+  smtp_port: 587,
+  smtp_secure: false,
+  smtp_user: null,
+  smtp_password: null,
+  smtp_from: null,
   updated_at: new Date(0).toISOString(),
 };
 

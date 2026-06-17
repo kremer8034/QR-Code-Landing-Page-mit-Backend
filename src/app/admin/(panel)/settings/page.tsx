@@ -4,7 +4,7 @@ import { getSettings } from '@/lib/settings';
 import { requireSession } from '@/lib/guard';
 import { Alert, Button, Card, CardBody, Field, Input, PageHeader, Select } from '@/components/ui';
 import {
-  updateBranding, updateOidc, createUser, deleteUser, resetUserPassword, uploadIcon, deleteIcon,
+  updateBranding, updateOidc, updateSmtp, sendTestEmail, createUser, deleteUser, resetUserPassword, uploadIcon, deleteIcon,
 } from './actions';
 import type { AdminUser, IconItem } from '@/lib/types';
 
@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 const TABS = [
   { key: 'branding', label: 'Darstellung' },
+  { key: 'email', label: 'E-Mail' },
   { key: 'sso', label: 'BRK.id / SSO' },
   { key: 'users', label: 'Benutzer' },
   { key: 'icons', label: 'Symbole' },
@@ -37,7 +38,9 @@ export default async function SettingsPage({
     <div>
       <PageHeader title="Einstellungen" />
 
-      {sp.saved ? <div className="mb-4"><Alert kind="success">Gespeichert.</Alert></div> : null}
+      {sp.saved === 'testmail' ? <div className="mb-4"><Alert kind="success">Testnachricht wurde versendet.</Alert></div> : null}
+      {sp.saved && sp.saved !== 'testmail' ? <div className="mb-4"><Alert kind="success">Gespeichert.</Alert></div> : null}
+      {sp.error === 'testmail' ? <div className="mb-4"><Alert kind="error">Testnachricht konnte nicht gesendet werden. Bitte SMTP-Einstellungen prüfen.</Alert></div> : null}
       {sp.error === 'userexists' ? <div className="mb-4"><Alert kind="error">Diese E-Mail existiert bereits.</Alert></div> : null}
       {sp.error === 'user' ? <div className="mb-4"><Alert kind="error">Bitte gültige E-Mail und Passwort (min. 8 Zeichen) angeben.</Alert></div> : null}
 
@@ -100,6 +103,58 @@ export default async function SettingsPage({
               </div>
 
               <Button type="submit">Speichern</Button>
+            </form>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {tab === 'email' ? (
+        <Card className="max-w-2xl">
+          <CardBody className="p-6">
+            <div className="mb-4">
+              <Alert kind="info">
+                Hinterlegen Sie hier ein SMTP-Postfach (z. B. das von Ihnen bereitgestellte E-Mail-Konto).
+                Es wird für den Versand von <strong>„Passwort vergessen"</strong>-E-Mails verwendet. Für Port 465
+                „SSL/TLS" aktivieren, für Port 587 (STARTTLS) deaktiviert lassen.
+              </Alert>
+            </div>
+            <form action={updateSmtp} className="space-y-4">
+              <Field label="SMTP-Server (Host)">
+                <Input name="smtp_host" defaultValue={settings.smtp_host ?? ''} placeholder="z. B. mail.ihre-domain.de" />
+              </Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Port">
+                  <Input name="smtp_port" type="number" defaultValue={String(settings.smtp_port ?? 587)} />
+                </Field>
+                <Field label="Verschlüsselung">
+                  <label className="flex items-center gap-2 mt-2.5">
+                    <input type="checkbox" name="smtp_secure" defaultChecked={settings.smtp_secure} className="h-4 w-4" />
+                    <span className="text-sm text-gray-700">SSL/TLS (Port 465)</span>
+                  </label>
+                </Field>
+              </div>
+              <Field label="Benutzername">
+                <Input name="smtp_user" defaultValue={settings.smtp_user ?? ''} autoComplete="off" placeholder="meist die E-Mail-Adresse" />
+              </Field>
+              <Field label="Passwort" hint={settings.smtp_password ? 'Ein Passwort ist gespeichert. Feld leer lassen, um es beizubehalten.' : undefined}>
+                <Input name="smtp_password" type="password" autoComplete="new-password" placeholder={settings.smtp_password ? '•••••••• (gespeichert)' : 'SMTP-Passwort'} />
+                {settings.smtp_password ? (
+                  <label className="flex items-center gap-2 text-xs text-gray-500 mt-1.5">
+                    <input type="checkbox" name="smtp_clear_password" className="h-3.5 w-3.5" /> gespeichertes Passwort entfernen
+                  </label>
+                ) : null}
+              </Field>
+              <Field label="Absender-Adresse (From)" hint='z. B. "Fuhrpark QR <noreply@ihre-domain.de>"'>
+                <Input name="smtp_from" defaultValue={settings.smtp_from ?? ''} placeholder="noreply@ihre-domain.de" />
+              </Field>
+              <Button type="submit">SMTP-Einstellungen speichern</Button>
+            </form>
+
+            <hr className="border-gray-100 my-6" />
+            <h3 className="font-semibold text-gray-900 mb-2">Testnachricht senden</h3>
+            <form action={sendTestEmail} className="flex flex-col sm:flex-row gap-2">
+              <Input name="to" type="email" placeholder={session.email} className="flex-1" />
+              <Button type="submit" variant="ghost">Test senden</Button>
             </form>
           </CardBody>
         </Card>

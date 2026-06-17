@@ -73,10 +73,10 @@ export function VehiclePicker({
                     type="checkbox"
                     checked={picked.has(v.id)}
                     onChange={() => toggle(v.id)}
-                    className="h-4 w-4"
+                    className="h-4 w-4 shrink-0"
                   />
-                  <span className="font-medium text-gray-900">{v.label}</span>
-                  {v.sub ? <span className="text-gray-400 truncate">· {v.sub}</span> : null}
+                  <span className="font-medium text-gray-900 whitespace-nowrap shrink-0">{v.label}</span>
+                  {v.sub ? <span className="text-gray-400 truncate min-w-0">· {v.sub}</span> : null}
                 </label>
               ))
             )}

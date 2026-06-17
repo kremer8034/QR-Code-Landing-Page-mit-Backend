@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, reset } = await searchParams;
 
   if (!isSupabaseConfigured()) {
     return (
@@ -57,6 +57,16 @@ export default async function LoginPage({
               <Alert kind="error">E-Mail oder Passwort ist ungültig.</Alert>
             </div>
           ) : null}
+          {error?.startsWith('oidc') ? (
+            <div className="mb-4">
+              <Alert kind="error">Die SSO-Anmeldung ist fehlgeschlagen. Bitte erneut versuchen oder mit E-Mail/Passwort anmelden.</Alert>
+            </div>
+          ) : null}
+          {reset ? (
+            <div className="mb-4">
+              <Alert kind="success">Ihr Passwort wurde geändert. Sie können sich jetzt anmelden.</Alert>
+            </div>
+          ) : null}
 
           <form action={loginAction} className="space-y-4">
             <Field label="E-Mail">
@@ -67,6 +77,12 @@ export default async function LoginPage({
             </Field>
             <Button type="submit" className="w-full">Anmelden</Button>
           </form>
+
+          <div className="mt-3 text-center">
+            <a href="/admin/forgot" className="text-sm text-gray-500 hover:text-gray-700">
+              Passwort vergessen?
+            </a>
+          </div>
 
           {settings.oidc_enabled ? (
             <div className="mt-6">

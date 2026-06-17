@@ -18,6 +18,12 @@ export interface Settings {
   oidc_button_label: string;
   oidc_auto_create: boolean;
   oidc_allowed_domains: string | null;
+  smtp_host: string | null;
+  smtp_port: number;
+  smtp_secure: boolean;
+  smtp_user: string | null;
+  smtp_password: string | null;
+  smtp_from: string | null;
   updated_at: string;
 }
 
@@ -33,6 +39,8 @@ export interface AdminUser {
   active: boolean;
   created_at: string;
   last_login: string | null;
+  reset_token_hash: string | null;
+  reset_expires: string | null;
 }
 
 export interface Group {

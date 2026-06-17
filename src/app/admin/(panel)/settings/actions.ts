@@ -66,6 +66,41 @@ export async function updateOidc(formData: FormData) {
   redirect('/admin/settings?saved=oidc&tab=sso');
 }
 
+export async function updateSmtp(formData: FormData) {
+  await requireAdmin();
+  const supabase = getSupabaseAdmin();
+
+  const port = parseInt(String(formData.get('smtp_port') ?? '587'), 10);
+  const patch: Record<string, unknown> = {
+    smtp_host: String(formData.get('smtp_host') ?? '').trim() || null,
+    smtp_port: Number.isFinite(port) && port > 0 ? port : 587,
+    smtp_secure: formData.get('smtp_secure') !== null,
+    smtp_user: String(formData.get('smtp_user') ?? '').trim() || null,
+    smtp_from: String(formData.get('smtp_from') ?? '').trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+  // Keep the stored password when the field is left empty.
+  const pass = String(formData.get('smtp_password') ?? '');
+  if (pass) patch.smtp_password = pass;
+  if (formData.get('smtp_clear_password') !== null) patch.smtp_password = null;
+
+  await supabase.from('settings').update(patch).eq('id', 1);
+  revalidatePath('/admin/settings');
+  redirect('/admin/settings?saved=smtp&tab=email');
+}
+
+export async function sendTestEmail(formData: FormData) {
+  const me = await requireAdmin();
+  const to = String(formData.get('to') ?? '').trim() || me.email;
+  const { sendMail } = await import('@/lib/mailer');
+  const ok = await sendMail({
+    to,
+    subject: 'Testnachricht – Fuhrpark QR',
+    text: 'Dies ist eine Testnachricht. Wenn Sie sie erhalten, ist der E-Mail-Versand korrekt konfiguriert.',
+  });
+  redirect(`/admin/settings?tab=email&${ok ? 'saved=testmail' : 'error=testmail'}`);
+}
+
 export async function createUser(formData: FormData) {
   await requireAdmin();
   const supabase = getSupabaseAdmin();

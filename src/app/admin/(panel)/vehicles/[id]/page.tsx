@@ -160,11 +160,11 @@ export default async function VehicleEditPage({
                           name="link_ids"
                           value={l.id}
                           defaultChecked={vehicleLinkIds.has(l.id)}
-                          className="h-4 w-4"
+                          className="h-4 w-4 shrink-0"
                         />
-                        <Icon icon={l.icon} size={18} />
-                        <span className="flex-1">
-                          <span className="font-medium text-gray-900">{l.label}</span>
+                        <span className="shrink-0"><Icon icon={l.icon} size={18} /></span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-medium text-gray-900 truncate">{l.label}</span>
                           <span className="block text-xs text-gray-400 truncate">{l.url}</span>
                         </span>
                       </label>
