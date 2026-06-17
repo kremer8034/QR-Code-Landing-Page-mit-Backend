@@ -21,8 +21,11 @@ export default async function VehiclesPage({
   let query = supabase.from('vehicles').select('*').order('created_at', { ascending: false });
   if (sp.group) query = query.eq('group_id', sp.group);
   if (sp.q) {
-    const q = sp.q.replace(/[%,]/g, ' ');
-    query = query.or(`license_plate.ilike.%${q}%,name.ilike.%${q}%,vin.ilike.%${q}%`);
+    // Strip characters that are significant in PostgREST filter strings
+    // (commas, parentheses, dots, wildcards, quotes) to prevent filter
+    // injection via the `or` expression, then limit length.
+    const q = sp.q.replace(/[%,()*."'\\]/g, ' ').trim().slice(0, 100);
+    if (q) query = query.or(`license_plate.ilike.%${q}%,name.ilike.%${q}%,vin.ilike.%${q}%`);
   }
   const { data: vehicles } = await query;
   const list = (vehicles as Vehicle[]) ?? [];

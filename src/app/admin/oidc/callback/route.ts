@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     user = (data as AdminUser) ?? null;
   }
   if (!user && email) {
-    const { data } = await supabase.from('admin_users').select('*').ilike('email', email).maybeSingle();
+    const { data } = await supabase.from('admin_users').select('*').eq('email', email).maybeSingle();
     user = (data as AdminUser) ?? null;
     if (user) {
       await supabase.from('admin_users').update({ oidc_sub: sub, provider: 'oidc' }).eq('id', user.id);

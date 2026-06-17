@@ -92,10 +92,14 @@ export async function countAdminUsers(): Promise<number> {
 
 export async function findUserByEmail(email: string): Promise<AdminUser | null> {
   const supabase = getSupabaseAdmin();
+  // Exact, case-insensitive match. Emails are always stored lower-cased, so a
+  // plain equality check avoids any LIKE/ilike wildcard interpretation of the
+  // user-supplied value (e.g. "%").
+  const normalized = email.trim().toLowerCase();
   const { data } = await supabase
     .from('admin_users')
     .select('*')
-    .ilike('email', email)
+    .eq('email', normalized)
     .maybeSingle();
   return (data as AdminUser) ?? null;
 }

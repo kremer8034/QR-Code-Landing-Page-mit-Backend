@@ -3,8 +3,9 @@ import { Alert, Button, Card, CardBody, Field, Input, PageHeader, Textarea } fro
 import { Icon } from '@/components/Icon';
 import { IconPicker } from '@/components/IconPicker';
 import { ICON_TEMPLATES } from '@/lib/icons';
+import { VehiclePicker } from '@/components/VehiclePicker';
 import { createLink, updateLink, deleteLink } from './actions';
-import type { Group, IconItem, LinkItem, LinkPlacement } from '@/lib/types';
+import type { Group, IconItem, LinkItem, LinkPlacement, Vehicle } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +17,18 @@ export default async function LinksPage({
   const sp = await searchParams;
   const supabase = getSupabaseAdmin();
 
-  const [{ data: links }, { data: groups }, { data: placements }, { data: icons }] = await Promise.all([
-    supabase.from('links').select('*').order('label'),
-    supabase.from('groups').select('*').order('name'),
-    supabase.from('link_placements').select('*'),
-    supabase.from('icons').select('*').order('created_at', { ascending: false }),
-  ]);
+  const [{ data: links }, { data: groups }, { data: placements }, { data: icons }, { data: vehicles }] =
+    await Promise.all([
+      supabase.from('links').select('*').order('label'),
+      supabase.from('groups').select('*').order('name'),
+      supabase.from('link_placements').select('*'),
+      supabase.from('icons').select('*').order('created_at', { ascending: false }),
+      supabase.from('vehicles').select('id, license_plate, name, group_id').order('license_plate'),
+    ]);
 
   const linkList = (links as LinkItem[]) ?? [];
   const groupList = (groups as Group[]) ?? [];
+  const groupNameMap = new Map(groupList.map((g) => [g.id, g.name]));
   const allPlacements = (placements as LinkPlacement[]) ?? [];
   const customIcons = ((icons as IconItem[]) ?? []).map((i) => ({
     value: i.storage_path,
@@ -32,9 +36,17 @@ export default async function LinksPage({
     name: i.name,
   }));
 
+  const vehicleOptions = ((vehicles as Pick<Vehicle, 'id' | 'license_plate' | 'name' | 'group_id'>[]) ?? []).map((v) => ({
+    id: v.id,
+    label: v.license_plate || '(ohne Kennzeichen)',
+    sub: [v.name, v.group_id ? groupNameMap.get(v.group_id) : null].filter(Boolean).join(' · '),
+  }));
+
   const isGlobal = (linkId: string) => allPlacements.some((p) => p.link_id === linkId && p.scope === 'global');
   const linkGroups = (linkId: string) =>
     new Set(allPlacements.filter((p) => p.link_id === linkId && p.scope === 'group').map((p) => p.group_id));
+  const linkVehicles = (linkId: string) =>
+    allPlacements.filter((p) => p.link_id === linkId && p.scope === 'vehicle' && p.vehicle_id).map((p) => p.vehicle_id as string);
 
   function GroupChecks({ selected }: { selected: Set<string | null> }) {
     if (groupList.length === 0) return <p className="text-xs text-gray-400">Keine Gruppen vorhanden.</p>;
@@ -87,6 +99,7 @@ export default async function LinksPage({
                   <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Für Gruppen</div>
                   <GroupChecks selected={new Set()} />
                 </div>
+                <VehiclePicker name="vehicle_ids" vehicles={vehicleOptions} selected={[]} />
               </div>
               <Button type="submit">Link anlegen</Button>
             </form>
@@ -113,6 +126,7 @@ export default async function LinksPage({
                       <span className="flex gap-1">
                         {isGlobal(l.id) ? <span className="text-xs rounded-full bg-green-100 text-green-700 px-2 py-0.5">global</span> : null}
                         {linkGroups(l.id).size > 0 ? <span className="text-xs rounded-full bg-blue-100 text-blue-700 px-2 py-0.5">{linkGroups(l.id).size} Gruppe(n)</span> : null}
+                        {linkVehicles(l.id).length > 0 ? <span className="text-xs rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">{linkVehicles(l.id).length} Fahrzeug(e)</span> : null}
                       </span>
                     </summary>
 
@@ -135,6 +149,7 @@ export default async function LinksPage({
                           <div className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Für Gruppen</div>
                           <GroupChecks selected={linkGroups(l.id)} />
                         </div>
+                        <VehiclePicker name="vehicle_ids" vehicles={vehicleOptions} selected={linkVehicles(l.id)} />
                       </div>
                       <div className="flex items-center justify-between">
                         <Button type="submit" variant="ghost">Speichern</Button>

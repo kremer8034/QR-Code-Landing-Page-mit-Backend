@@ -48,22 +48,27 @@ export async function updateLink(formData: FormData) {
 }
 
 /**
- * Apply global + group placements from the link form. The form sends
- * `scope_global` (checkbox) and `group_ids` (multi-select). Vehicle-scoped
- * placements are managed separately on the vehicle page and left untouched.
+ * Apply global + group + vehicle placements from the link form. The form sends
+ * `scope_global` (checkbox), `group_ids` (multi-select) and `vehicle_ids`
+ * (searchable multi-select). For each scope it fully replaces this link's
+ * placements with the submitted selection.
  */
 async function applyScopes(linkId: string, formData: FormData) {
   const supabase = getSupabaseAdmin();
   const wantGlobal = formData.get('scope_global') !== null;
   const groupIds = formData.getAll('group_ids').map(String).filter(Boolean);
+  const vehicleIds = formData.getAll('vehicle_ids').map(String).filter(Boolean);
 
-  // Replace global + group placements for this link.
-  await supabase.from('link_placements').delete().eq('link_id', linkId).in('scope', ['global', 'group']);
+  // Replace all placements for this link with the submitted selection.
+  await supabase.from('link_placements').delete().eq('link_id', linkId);
 
-  const rows: any[] = [];
+  const rows: Record<string, unknown>[] = [];
   if (wantGlobal) rows.push({ link_id: linkId, scope: 'global', position: 0, enabled: true });
   for (const gid of groupIds) {
     rows.push({ link_id: linkId, scope: 'group', group_id: gid, position: 0, enabled: true });
+  }
+  for (const vid of vehicleIds) {
+    rows.push({ link_id: linkId, scope: 'vehicle', vehicle_id: vid, position: 0, enabled: true });
   }
   if (rows.length) await supabase.from('link_placements').insert(rows);
 }

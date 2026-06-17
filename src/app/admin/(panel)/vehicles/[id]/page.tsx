@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSettings, resolveBaseUrl } from '@/lib/settings';
 import { vehicleUrl } from '@/lib/qr';
@@ -6,6 +7,7 @@ import {
   Alert, Button, Card, CardBody, Field, Input, LinkButton, PageHeader, Select, Textarea,
 } from '@/components/ui';
 import { Icon } from '@/components/Icon';
+import { CopyField } from '@/components/CopyField';
 import { Download, ExternalLink, ImageIcon, Printer } from 'lucide-react';
 import { updateVehicle, deleteVehicle } from '../actions';
 import { setVehiclePlacements } from '../../links/actions';
@@ -49,7 +51,14 @@ export default async function VehicleEditPage({
     : [];
 
   const settings = await getSettings();
-  const baseUrl = resolveBaseUrl(settings, null);
+  // Build the absolute landing-page URL. Prefer the configured QR base URL;
+  // otherwise fall back to the current request host so we always show a full,
+  // copyable URL (never just the relative /v/<id> path).
+  const h = await headers();
+  const host = h.get('host');
+  const proto = h.get('x-forwarded-proto') ?? 'https';
+  const requestOrigin = host ? `${proto}://${host}` : null;
+  const baseUrl = resolveBaseUrl(settings, requestOrigin);
   const target = vehicleUrl(baseUrl || '', vehicle.public_id);
 
   return (
@@ -179,14 +188,17 @@ export default async function VehicleEditPage({
                 alt="QR-Code"
                 className="mx-auto w-44 h-44 ring-1 ring-gray-200 rounded-xl"
               />
-              <a
-                href={target || '#'}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 break-all"
-              >
-                <ExternalLink size={12} /> {target || `/v/${vehicle.public_id}`}
-              </a>
+              <div className="mt-4 text-left">
+                <CopyField label="Landingpage-Link (zum Kopieren)" value={target || `/v/${vehicle.public_id}`} />
+                <a
+                  href={target || '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                >
+                  <ExternalLink size={12} /> Seite in neuem Tab öffnen
+                </a>
+              </div>
 
               <div className="mt-4 grid gap-2">
                 <a href={`/api/qr/${vehicle.public_id}?download=1`} className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold btn-brand">

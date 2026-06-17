@@ -43,20 +43,25 @@ export async function updateBranding(formData: FormData) {
 export async function updateOidc(formData: FormData) {
   await requireAdmin();
   const supabase = getSupabaseAdmin();
-  await supabase
-    .from('settings')
-    .update({
-      oidc_enabled: formData.get('oidc_enabled') !== null,
-      oidc_issuer: String(formData.get('oidc_issuer') ?? '').trim() || null,
-      oidc_client_id: String(formData.get('oidc_client_id') ?? '').trim() || null,
-      oidc_client_secret: String(formData.get('oidc_client_secret') ?? '').trim() || null,
-      oidc_scopes: String(formData.get('oidc_scopes') ?? 'openid email profile').trim() || 'openid email profile',
-      oidc_button_label: String(formData.get('oidc_button_label') ?? '').trim() || 'Anmelden mit BRK.id',
-      oidc_auto_create: formData.get('oidc_auto_create') !== null,
-      oidc_allowed_domains: String(formData.get('oidc_allowed_domains') ?? '').trim() || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', 1);
+
+  const patch: Record<string, unknown> = {
+    oidc_enabled: formData.get('oidc_enabled') !== null,
+    oidc_issuer: String(formData.get('oidc_issuer') ?? '').trim() || null,
+    oidc_client_id: String(formData.get('oidc_client_id') ?? '').trim() || null,
+    oidc_scopes: String(formData.get('oidc_scopes') ?? 'openid email profile').trim() || 'openid email profile',
+    oidc_button_label: String(formData.get('oidc_button_label') ?? '').trim() || 'Anmelden mit BRK.id',
+    oidc_auto_create: formData.get('oidc_auto_create') !== null,
+    oidc_allowed_domains: String(formData.get('oidc_allowed_domains') ?? '').trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  // The secret is never sent back to the browser. Only overwrite it when a new
+  // value is entered; an empty field keeps the stored secret unchanged.
+  const secret = String(formData.get('oidc_client_secret') ?? '').trim();
+  if (secret) patch.oidc_client_secret = secret;
+  if (formData.get('oidc_clear_secret') !== null) patch.oidc_client_secret = null;
+
+  await supabase.from('settings').update(patch).eq('id', 1);
   revalidatePath('/admin/settings');
   redirect('/admin/settings?saved=oidc&tab=sso');
 }

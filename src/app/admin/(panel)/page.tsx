@@ -1,6 +1,7 @@
+import Link from 'next/link';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { Card, CardBody, LinkButton, PageHeader } from '@/components/ui';
-import { Car, FolderTree, Link2, ScanLine } from 'lucide-react';
+import { Car, ChevronRight, FolderTree, Link2, ScanLine } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,20 +70,25 @@ export default async function Dashboard() {
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label}>
-              <CardBody className="flex items-center gap-4">
+            <Link
+              key={s.label}
+              href={s.href}
+              className="group rounded-2xl bg-white ring-1 ring-gray-200 shadow-sm hover:ring-gray-400 transition"
+            >
+              <div className="p-5 flex items-center gap-4">
                 <div
                   className="h-12 w-12 rounded-xl flex items-center justify-center"
                   style={{ background: 'var(--brand)', color: 'var(--brand-fg)' }}
                 >
                   <Icon size={22} />
                 </div>
-                <div>
+                <div className="flex-1">
                   <div className="text-2xl font-bold text-gray-900">{s.value}</div>
                   <div className="text-sm text-gray-500">{s.label}</div>
                 </div>
-              </CardBody>
-            </Card>
+                <ChevronRight size={18} className="text-gray-300 group-hover:text-gray-500" />
+              </div>
+            </Link>
           );
         })}
       </div>
@@ -104,13 +110,18 @@ export default async function Dashboard() {
             {topVehicles.length === 0 ? (
               <p className="text-sm text-gray-500">Noch keine Scans erfasst.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {topVehicles.map((v) => (
-                  <li key={v.id} className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-900">
-                      {v.license_plate} {v.name ? <span className="text-gray-400">· {v.name}</span> : null}
-                    </span>
-                    <span className="font-bold text-gray-700">{v.count}</span>
+                  <li key={v.id}>
+                    <Link
+                      href={`/admin/vehicles/${v.id}`}
+                      className="flex items-center justify-between text-sm rounded-lg px-2 py-1.5 -mx-2 hover:bg-gray-50"
+                    >
+                      <span className="font-medium text-gray-900">
+                        {v.license_plate} {v.name ? <span className="text-gray-400">· {v.name}</span> : null}
+                      </span>
+                      <span className="font-bold text-gray-700">{v.count}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>

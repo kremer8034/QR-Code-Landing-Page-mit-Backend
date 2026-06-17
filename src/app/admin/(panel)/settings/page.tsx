@@ -129,8 +129,13 @@ export default async function SettingsPage({
                 <Field label="Client ID">
                   <Input name="oidc_client_id" defaultValue={settings.oidc_client_id ?? ''} />
                 </Field>
-                <Field label="Client Secret">
-                  <Input name="oidc_client_secret" type="password" defaultValue={settings.oidc_client_secret ?? ''} placeholder="(unverändert lassen)" />
+                <Field label="Client Secret" hint={settings.oidc_client_secret ? 'Ein Secret ist gespeichert. Feld leer lassen, um es beizubehalten.' : undefined}>
+                  <Input name="oidc_client_secret" type="password" autoComplete="new-password" placeholder={settings.oidc_client_secret ? '•••••••• (gespeichert)' : 'Client Secret'} />
+                  {settings.oidc_client_secret ? (
+                    <label className="flex items-center gap-2 text-xs text-gray-500 mt-1.5">
+                      <input type="checkbox" name="oidc_clear_secret" className="h-3.5 w-3.5" /> gespeichertes Secret entfernen
+                    </label>
+                  ) : null}
                 </Field>
               </div>
               <Field label="Scopes">
