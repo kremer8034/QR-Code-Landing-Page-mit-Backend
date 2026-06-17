@@ -15,7 +15,7 @@ const items = [
   { href: '/admin', label: 'Übersicht', icon: LayoutDashboard, exact: true },
   { href: '/admin/vehicles', label: 'Fahrzeuge', icon: Car },
   { href: '/admin/groups', label: 'Gruppen', icon: FolderTree },
-  { href: '/admin/links', label: 'Links', icon: Link2 },
+  { href: '/admin/links', label: 'Inhalte & Links', icon: Link2 },
   { href: '/admin/stats', label: 'Statistik', icon: BarChart3 },
   { href: '/admin/settings', label: 'Einstellungen', icon: Settings },
 ];
