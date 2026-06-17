@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { Button, Card, CardBody, Field, Input, PageHeader, Textarea } from '@/components/ui';
+import { Button, Card, CardBody, Field, Input, LinkButton, PageHeader, Textarea } from '@/components/ui';
 import { createGroup, updateGroup, deleteGroup } from './actions';
 import type { Group } from '@/lib/types';
 
@@ -55,8 +55,9 @@ export default async function GroupsPage() {
                       <span className="text-sm text-gray-400 whitespace-nowrap">{counts.get(g.id) ?? 0} Fahrz.</span>
                     </div>
                     <Textarea name="description" rows={2} defaultValue={g.description} placeholder="Beschreibung" />
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button type="submit" variant="ghost">Speichern</Button>
+                      <LinkButton href={`/admin/groups/${g.id}/order`} variant="ghost">Reihenfolge der Inhalte</LinkButton>
                     </div>
                   </form>
                   <form action={deleteGroup} className="mt-2">

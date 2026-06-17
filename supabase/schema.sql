@@ -106,6 +106,14 @@ create index if not exists placements_link_idx on public.link_placements(link_id
 create index if not exists placements_group_idx on public.link_placements(group_id);
 create index if not exists placements_vehicle_idx on public.link_placements(vehicle_id);
 
+-- Per-group display order of content elements (overrides the global order)
+create table if not exists public.group_link_order (
+  group_id uuid not null references public.groups(id) on delete cascade,
+  link_id  uuid not null references public.links(id) on delete cascade,
+  position integer not null default 0,
+  primary key (group_id, link_id)
+);
+
 create table if not exists public.icons (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
@@ -131,6 +139,7 @@ alter table public.groups          enable row level security;
 alter table public.vehicles        enable row level security;
 alter table public.links           enable row level security;
 alter table public.link_placements enable row level security;
+alter table public.group_link_order enable row level security;
 alter table public.icons           enable row level security;
 alter table public.scans           enable row level security;
 

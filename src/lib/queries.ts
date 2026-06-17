@@ -53,9 +53,26 @@ export async function resolveVehicleLinks(vehicle: Vehicle): Promise<ResolvedLin
     if (link) resolved.push({ link, scope: p.scope, position: p.position });
   }
 
-  // Order is controlled centrally via each element's sort_order (set in the
-  // backoffice). Falls back to scope then label for ties.
+  // Per-group ordering: if the vehicle belongs to a group with a custom order,
+  // those positions take precedence. Otherwise fall back to the global
+  // sort_order (used for vehicles without a group and as a default).
+  const groupPos = new Map<string, number>();
+  if (vehicle.group_id) {
+    const { data: order } = await supabase
+      .from('group_link_order')
+      .select('link_id, position')
+      .eq('group_id', vehicle.group_id);
+    for (const o of (order as { link_id: string; position: number }[]) ?? []) {
+      groupPos.set(o.link_id, o.position);
+    }
+  }
+
   resolved.sort((a, b) => {
+    const pa = groupPos.get(a.link.id);
+    const pb = groupPos.get(b.link.id);
+    if (pa != null && pb != null && pa !== pb) return pa - pb;
+    if (pa != null && pb == null) return -1; // group-ordered items first
+    if (pa == null && pb != null) return 1;
     if (a.link.sort_order !== b.link.sort_order) return a.link.sort_order - b.link.sort_order;
     if (scopeRank[a.scope] !== scopeRank[b.scope]) return scopeRank[a.scope] - scopeRank[b.scope];
     return a.link.label.localeCompare(b.link.label, 'de');

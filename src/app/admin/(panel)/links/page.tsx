@@ -55,7 +55,7 @@ export default async function LinksPage({
     <div>
       <PageHeader
         title="Inhalte & Links"
-        subtitle="Zentrale Bibliothek. Eine Änderung wirkt sofort auf allen zugeordneten Landingpages."
+        subtitle="Zentrale Bibliothek. Die Pfeile legen die Standard-Reihenfolge fest; pro Gruppe lässt sich die Reihenfolge unter „Gruppen“ separat einstellen."
       />
 
       {sp.saved ? <div className="mb-4"><Alert kind="success">Gespeichert.</Alert></div> : null}
